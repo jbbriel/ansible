@@ -1,0 +1,64 @@
+---
+- name: Download Checkmarx Engine Pack
+  hosts: "{{ host | default('staging-checkmarx')}}"
+  gather_facts: no
+  vars_files:
+    - ../etc/ansible/group_vars/staging.yml
+  vars:
+    ansible_user: "{{ cava_user }}"
+    ansible_password: "{{ cava_password }}"
+    destination_folder: E:\Checkmarx\temp
+
+  vars_prompt:
+    - name: checkmarx_user
+      prompt: What is your artifactory username?
+      private: false
+
+    - name: checkmarx_pass
+      prompt: What is your artifactory password?
+
+    - name: engine_pack_url
+      prompt: Enter Engine Pack URL
+      private: false
+
+    - name: setup_pack_url
+      prompt: Enter Setup Pack URL
+      private: false
+
+  tasks:
+
+  # - name: Test connectivity
+  #   win_ping:
+
+  - name: Create missing directories
+    win_file:
+      path: "{{ destination_folder }}"
+      state: directory
+
+  - name: Download Engine Pack
+    win_get_url:
+      url: "{{ item }}"
+      dest: "{{ destination_folder }}"
+      url_username: "{{ checkmarx_user }}"
+      url_password: "{{ checkmarx_pass }}"
+    with_items:
+      - "{{ engine_pack_url }}"
+      - "{{ setup_pack_url }}"
+
+  - name: Find zip files in the specified directory
+    win_find:
+      paths: E:\Checkmarx\temp
+      recurse: yes
+      patterns: '*.zip'
+    register: zip_files
+
+  - name: Unzip each file
+    win_unzip:
+      src: "{{ item.path }}"
+      dest: "E:\\Checkmarx\\{{ item.path | win_basename | regex_replace('(.zip)$', '') }}"
+    with_items: "{{ zip_files.files }}"
+
+  - name: Clean Up Temporary Files
+    win_file:
+      path: "{{ destination_folder }}"
+      state: absent
